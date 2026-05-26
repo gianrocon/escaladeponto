@@ -1,0 +1,11 @@
+# PDFs com dados de funcionários — não versionar
+*.pdf
+
+# Python
+__pycache__/
+*.py[cod]
+.env
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Escala Mensal</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0f172a;
+      --surface:   #1e293b;
+      --surface2:  #263248;
+      --border:    #334155;
+      --text:      #f1f5f9;
+      --muted:     #94a3b8;
+      --accent:    #3b82f6;
+      --ok:        #22c55e;
+      --err:       #ef4444;
+
+      --M2: #f59e0b;   /* 4h — âmbar  */
+      --M:  #3b82f6;   /* 6h — azul   */
+      --A:  #10b981;   /* 8h — verde  */
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ─── HEADER ─────────────────────────────────────── */
+    .app-header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 24px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .header-left h1 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .emp-info {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+    .emp-info span + span::before { content: ' · '; }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .legend {
+      display: flex;
+      gap: 6px;
+    }
+    .chip {
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #fff;
+      white-space: nowrap;
+    }
+    .chip-M2 { background: var(--M2); }
+    .chip-M  { background: var(--M);  }
+    .chip-A  { background: var(--A);  }
+
+    .btn {
+      padding: 8px 18px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: filter 0.15s;
+    }
+    .btn:hover { filter: brightness(1.15); }
+    .btn-primary { background: var(--accent); color: #fff; }
+
+    /* ─── STATS BAR ──────────────────────────────────── */
+    .stats-bar {
+      display: flex;
+      background: var(--surface2);
+      border-radius: 10px;
+      border: 2px solid var(--border);
+      overflow: hidden;
+      transition: border-color 0.3s;
+    }
+    .stats-bar.ok    { border-color: var(--ok); }
+    .stats-bar.error { border-color: var(--err); }
+
+    .stat {
+      flex: 1;
+      padding: 8px 12px;
+      border-right: 1px solid var(--border);
+      text-align: center;
+    }
+    .stat:last-child { border-right: none; }
+    .stat .lbl {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      font-weight: 700;
+    }
+    .stat .val {
+      font-size: 1rem;
+      font-weight: 800;
+      margin-top: 1px;
+    }
+    .stat.ok  .val { color: var(--ok); }
+    .stat.err .val { color: var(--err); }
+
+    /* ─── MAIN ───────────────────────────────────────── */
+    .main {
+      padding: 20px 24px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    /* ─── MONTH NAV ──────────────────────────────────── */
+    .month-nav {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      margin-bottom: 14px;
+    }
+    .month-nav h2 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      min-width: 210px;
+      text-align: center;
+    }
+    .nav-btn {
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 1.2rem;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s;
+    }
+    .nav-btn:hover { background: var(--surface2); border-color: var(--accent); }
+
+    /* ─── CALENDAR GRID ──────────────────────────────── */
+    .cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 6px;
+    }
+
+    .cal-dow {
+      text-align: center;
+      font-size: 0.7rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      padding: 4px 4px 3px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+    }
+    .cal-dow.wknd { color: #56677e; }
+
+    .dow-check {
+      width: 12px;
+      height: 12px;
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+      background: transparent;
+      border: 1.5px solid #475569;
+      border-radius: 3px;
+      transition: background 0.15s, border-color 0.15s;
+      flex-shrink: 0;
+    }
+    .dow-check:hover { border-color: var(--accent); }
+    .dow-check:checked {
+      background: var(--accent);
+      border-color: var(--accent);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 8'%3E%3Cpath d='M1 4l3 3 5-6' stroke='%23fff' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-size: 9px 7px;
+      background-repeat: no-repeat;
+      background-position: center;
+    }
+    .dow-check:indeterminate {
+      background: rgba(59,130,246,.35);
+      border-color: var(--accent);
+    }
+
+    .cal-day {
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 7px 6px 6px;
+      min-height: 88px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      transition: border-color 0.15s, background 0.15s;
+      position: relative;
+    }
+    .cal-day.empty {
+      background: transparent;
+      border-color: transparent;
+      pointer-events: none;
+    }
+    .cal-day.wknd {
+      background: #141d2e;
+      border-color: #1e293b;
+    }
+    .cal-day.today {
+      border-color: rgba(59,130,246,.5);
+    }
+    .cal-day.drag-over {
+      border-color: var(--accent) !important;
+      background: #182a42 !important;
+      box-shadow: 0 0 0 2px rgba(59,130,246,.25);
+    }
+    .cal-day:not(.empty):hover { border-color: #475569; }
+
+    .day-num {
+      font-size: 0.72rem;
+      font-weight: 800;
+      color: var(--muted);
+      user-select: none;
+      line-height: 1;
+    }
+    .today .day-num { color: var(--accent); }
+
+    .shifts-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      flex: 1;
+    }
+
+    /* ─── SHIFT BOX ──────────────────────────────────── */
+    .shift-box {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 7px;
+      border-radius: 6px;
+      cursor: grab;
+      user-select: none;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .shift-box:active { cursor: grabbing; }
+    .shift-box.is-dragging { opacity: 0.35; }
+
+    .shift-box .s-lbl {
+      font-weight: 800;
+      font-size: 0.82rem;
+      color: #fff;
+      flex: 1;
+    }
+    .shift-box .s-hrs {
+      font-size: 0.72rem;
+      color: rgba(255,255,255,.75);
+    }
+    .shift-box .s-del {
+      background: rgba(0,0,0,.3);
+      border: none;
+      color: rgba(255,255,255,.85);
+      width: 15px; height: 15px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 0.6rem;
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0;
+      transition: opacity 0.15s;
+      padding: 0; line-height: 1;
+      flex-shrink: 0;
+    }
+    .shift-box:hover .s-del { opacity: 1; }
+    .s-del:hover { background: rgba(0,0,0,.55) !important; }
+
+    /* ─── ADD BUTTON ─────────────────────────────────── */
+    .add-btn {
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: transparent;
+      border: 1.5px dashed var(--border);
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 0.9rem;
+      display: flex; align-items: center; justify-content: center;
+      align-self: flex-start;
+      padding: 0;
+      transition: all 0.15s;
+      line-height: 1;
+      margin-top: 1px;
+    }
+    .add-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(59,130,246,.1);
+    }
+
+    /* ─── SHIFT PICKER MENU ──────────────────────────── */
+    .shift-menu {
+      position: fixed;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 5px;
+      box-shadow: 0 10px 40px rgba(0,0,0,.6);
+      z-index: 9000;
+      min-width: 150px;
+    }
+    .sm-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 7px 10px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.83rem;
+      font-weight: 700;
+      color: #fff;
+      text-align: left;
+      margin-bottom: 3px;
+      transition: filter 0.1s;
+    }
+    .sm-item:last-child { margin-bottom: 0; }
+    .sm-item:hover { filter: brightness(1.2); }
+    .sm-item .sm-hrs {
+      font-weight: 400;
+      font-size: 0.75rem;
+      color: rgba(255,255,255,.75);
+      margin-left: auto;
+    }
+
+    /* ─── LOADING ────────────────────────────────────── */
+    .loading {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(15,23,42,.82);
+      z-index: 9999;
+      align-items: center; justify-content: center;
+      flex-direction: column; gap: 14px;
+    }
+    .loading.on { display: flex; }
+    .spinner {
+      width: 38px; height: 38px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    .loading p { color: var(--muted); font-size: .88rem; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── REQ EDIT CONTROLS ─────────────────────────── */
+    .req-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      margin-top: 2px;
+    }
+    .req-step {
+      padding: 2px 7px;
+      background: rgba(255,255,255,.07);
+      border: 1px solid rgba(255,255,255,.13);
+      border-radius: 5px;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 0.68rem;
+      font-weight: 700;
+      white-space: nowrap;
+      transition: all 0.15s;
+      line-height: 1.6;
+    }
+    .req-step:hover {
+      background: rgba(255,255,255,.15);
+      color: var(--text);
+      border-color: rgba(255,255,255,.3);
+    }
+
+    /* ─── DAY CHECKBOX ──────────────────────────────── */
+    .day-check {
+      position: absolute;
+      top: 5px;
+      right: 6px;
+      width: 13px;
+      height: 13px;
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+      background: transparent;
+      border: 1.5px solid #475569;
+      border-radius: 3px;
+      transition: background 0.15s, border-color 0.15s;
+      flex-shrink: 0;
+      z-index: 1;
+    }
+    .day-check:hover { border-color: var(--accent); }
+    .day-check:checked {
+      background: var(--accent);
+      border-color: var(--accent);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 8'%3E%3Cpath d='M1 4l3 3 5-6' stroke='%23fff' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-size: 9px 7px;
+      background-repeat: no-repeat;
+      background-position: center;
+    }
+
+    .cal-day.selected {
+      border-color: rgba(59,130,246,.75) !important;
+      background-color: rgba(59,130,246,.08) !important;
+    }
+
+    /* ─── CHIPS COMO BOTÕES DE APLICAÇÃO ─────────────── */
+    .chip {
+      cursor: pointer;
+      transition: filter 0.15s, transform 0.12s;
+      user-select: none;
+    }
+    .chip:hover  { filter: brightness(1.25); transform: scale(1.06); }
+    .chip:active { transform: scale(0.95); }
+
+    /* Chips sem seleção ficam levemente opacos */
+    .legend .chip { opacity: 0.45; transition: opacity 0.2s, filter 0.15s, transform 0.12s; }
+    .legend.has-sel .chip { opacity: 1; }
+
+    /* ─── MISC ───────────────────────────────────────── */
+    @media (max-width: 720px) {
+      .main { padding: 14px; }
+      .cal-day { min-height: 70px; padding: 5px 4px; }
+      .app-header { padding: 10px 14px 8px; }
+    }
+  </style>
+</head>
+
+<body>
+
+<!-- Loading overlay -->
+<div id="loading" class="loading">
+  <div class="spinner"></div>
+  <p>Processando PDF…</p>
+</div>
+
+<!-- ─── HEADER ─────────────────────────────────────── -->
+<header class="app-header">
+  <div class="header-top">
+    <div class="header-left">
+      <h1>📅 Escala Mensal</h1>
+      <div class="emp-info">
+        <span id="empRef">Carregue um PDF para importar a escala</span>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <div class="legend" id="legend">
+        <div class="chip chip-M2" data-type="M2" title="Aplicar M2 nos dias selecionados">M2 · 4h</div>
+        <div class="chip chip-M"  data-type="M"  title="Aplicar M nos dias selecionados">M · 6h</div>
+        <div class="chip chip-A"  data-type="A"  title="Aplicar A nos dias selecionados">A · 8h</div>
+      </div>
+      <button class="btn btn-primary" id="loadBtn">📂 Carregar PDF</button>
+      <input type="file" id="pdfFile" accept=".pdf" style="display:none">
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-bar" id="statsBar">
+    <div class="stat">
+      <div class="lbl">A Trabalhar</div>
+      <div class="req-row">
+        <button class="req-step" id="reqMinus">−4h</button>
+        <div class="val" id="sReq">0:00h</div>
+        <button class="req-step" id="reqPlus">+4h</button>
+      </div>
+    </div>
+    <div class="stat">
+      <div class="lbl">Distribuído</div>
+      <div class="val" id="sDist">0:00h</div>
+    </div>
+    <div class="stat" id="sDiffStat">
+      <div class="lbl">Diferença</div>
+      <div class="val" id="sDiff">—</div>
+    </div>
+  </div>
+</header>
+
+<!-- ─── MAIN ──────────────────────────────────────── -->
+<main class="main">
+  <div class="month-nav">
+    <button class="nav-btn" id="prevMon">‹</button>
+    <h2 id="monthTitle">—</h2>
+    <button class="nav-btn" id="nextMon">›</button>
+  </div>
+
+  <div class="cal-grid" id="calGrid"></div>
+</main>
+
+<script>
+// ════════════════════════════════════════════════════
+//  CONFIG
+// ════════════════════════════════════════════════════
+const SHIFTS = {
+  M2: { hours: 4, color: '#f59e0b', name: 'Manhã 2' },
+  M:  { hours: 6, color: '#3b82f6', name: 'Manhã'   },
+  A:  { hours: 8, color: '#10b981', name: 'Administrativo' },
+};
+
+const DOW   = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+// pdf.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// ════════════════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════════════════
+const today = new Date();
+
+const S = {
+  year:     today.getFullYear(),
+  month:    today.getMonth(),   // 0-based
+  pdfYear:  null,               // year of loaded PDF
+  pdfMonth: null,               // month of loaded PDF (0-based)
+  required: 4800,               // minutos — padrão 80h, múltiplo de 4h
+  // shifts[dateKey] = [{id, type}]
+  shifts:   {},
+  // drag state
+  dragId:   null,
+  dragSrc:  null,
+  // seleção múltipla de dias
+  selectedDays: new Set(),
+};
+
+// ════════════════════════════════════════════════════
+//  UTILS
+// ════════════════════════════════════════════════════
+const uid   = () => Math.random().toString(36).slice(2, 9);
+const dkey  = (y, m, d) =>
+  `${y}-${String(m + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+const dims  = (y, m) => new Date(y, m + 1, 0).getDate();
+
+function fmtMins(mins) {
+  if (mins === null || mins === undefined) return '—';
+  const sign = mins < 0 ? '−' : '';
+  const abs  = Math.abs(mins);
+  return `${sign}${Math.floor(abs / 60)}:${String(abs % 60).padStart(2,'0')}h`;
+}
+
+function calcDist() {
+  let t = 0;
+  for (let d = 1; d <= dims(S.year, S.month); d++) {
+    const k = dkey(S.year, S.month, d);
+    for (const sh of (S.shifts[k] || [])) t += (SHIFTS[sh.type]?.hours ?? 0) * 60;
+  }
+  return t;
+}
+
+// ════════════════════════════════════════════════════
+//  STATS
+// ════════════════════════════════════════════════════
+function updateStats() {
+  const req  = S.required;   // always use current (editable) value
+  const dist = calcDist();
+
+  document.getElementById('sReq').textContent  = fmtMins(req);
+  document.getElementById('sDist').textContent = fmtMins(dist);
+
+  const bar      = document.getElementById('statsBar');
+  const diffStat = document.getElementById('sDiffStat');
+  const diffVal  = document.getElementById('sDiff');
+
+  if (dist === req) {
+    diffVal.textContent = '✓ OK';
+    diffStat.className  = 'stat ok';
+    bar.className       = 'stats-bar ok';
+  } else {
+    const diff = dist - req;
+    diffVal.textContent = (diff > 0 ? '+' : '') + fmtMins(diff);
+    diffStat.className  = 'stat err';
+    bar.className       = 'stats-bar error';
+  }
+
+  // Month title
+  document.getElementById('monthTitle').textContent =
+    `${MONTHS[S.month]} ${S.year}`;
+
+  // Status hint (sem nome do trabalhador)
+  document.getElementById('empRef').textContent =
+    (S.pdfMonth === S.month && S.pdfYear === S.year)
+      ? '✓ Escala importada do PDF'
+      : 'Carregue um PDF para importar a escala';
+}
+
+// ════════════════════════════════════════════════════
+//  CALENDAR
+// ════════════════════════════════════════════════════
+function renderCal() {
+  const grid = document.getElementById('calGrid');
+  grid.innerHTML = '';
+
+  // Day-of-week headers  (com checkbox "selecionar toda a coluna")
+  dowCheckboxes = [];
+  DOW.forEach((name, i) => {
+    const el = document.createElement('div');
+    el.className = `cal-dow${(i === 0 || i === 6) ? ' wknd' : ''}`;
+
+    const lbl = document.createElement('span');
+    lbl.textContent = name;
+    el.appendChild(lbl);
+
+    const chk = document.createElement('input');
+    chk.type      = 'checkbox';
+    chk.className = 'dow-check';
+    chk.title     = `Selecionar todas as ${name} do mês`;
+    chk.addEventListener('change', () => {
+      const { year, month } = S;
+      const totalDays = dims(year, month);
+      for (let d = 1; d <= totalDays; d++) {
+        if (new Date(year, month, d).getDay() !== i) continue;
+        const key = dkey(year, month, d);
+        if (chk.checked) S.selectedDays.add(key);
+        else             S.selectedDays.delete(key);
+        const cell    = document.querySelector(`.cal-day[data-date="${key}"]`);
+        if (cell) {
+          cell.classList.toggle('selected', chk.checked);
+          const dc = cell.querySelector('.day-check');
+          if (dc) dc.checked = chk.checked;
+        }
+      }
+      updateLegendUI();
+      updateDowChecks();
+    });
+    el.appendChild(chk);
+    dowCheckboxes.push(chk);
+
+    grid.appendChild(el);
+  });
+
+  const { year, month } = S;
+  const firstDow   = new Date(year, month, 1).getDay();
+  const totalDays  = dims(year, month);
+  const todayKey   = dkey(today.getFullYear(), today.getMonth(), today.getDate());
+
+  // Empty cells before month starts
+  for (let i = 0; i < firstDow; i++) {
+    const el = document.createElement('div');
+    el.className = 'cal-day empty';
+    grid.appendChild(el);
+  }
+
+  // Day cells
+  for (let d = 1; d <= totalDays; d++) {
+    const key  = dkey(year, month, d);
+    const dow  = new Date(year, month, d).getDay();
+    const wknd = dow === 0 || dow === 6;
+
+    const cell = document.createElement('div');
+    const isSel = S.selectedDays.has(key);
+    cell.className =
+      `cal-day${wknd ? ' wknd' : ''}${key === todayKey ? ' today' : ''}${isSel ? ' selected' : ''}`;
+    cell.dataset.date = key;
+
+    // Checkbox de seleção (canto superior direito)
+    const chk = document.createElement('input');
+    chk.type      = 'checkbox';
+    chk.className = 'day-check';
+    chk.checked   = S.selectedDays.has(key);
+    chk.title     = 'Selecionar dia';
+    chk.addEventListener('change', e => {
+      e.stopPropagation();
+      if (chk.checked) { S.selectedDays.add(key);    cell.classList.add('selected'); }
+      else             { S.selectedDays.delete(key); cell.classList.remove('selected'); }
+      updateLegendUI();
+      updateDowChecks();
+    });
+    cell.appendChild(chk);
+
+    // Day number
+    const num = document.createElement('div');
+    num.className   = 'day-num';
+    num.textContent = d;
+    cell.appendChild(num);
+
+    // Shifts container
+    const wrap = document.createElement('div');
+    wrap.className = 'shifts-wrap';
+    for (const sh of (S.shifts[key] || [])) {
+      wrap.appendChild(makeShiftBox(sh, key));
+    }
+    cell.appendChild(wrap);
+
+    // Add (+) button
+    const addBtn = document.createElement('button');
+    addBtn.className   = 'add-btn';
+    addBtn.title       = 'Adicionar turno';
+    addBtn.textContent = '+';
+    addBtn.addEventListener('click', e => { e.stopPropagation(); openMenu(e, key); });
+    cell.appendChild(addBtn);
+
+    // Drop events
+    cell.addEventListener('dragover', e => {
+      if (!S.dragId) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      cell.classList.add('drag-over');
+    });
+    cell.addEventListener('dragleave', () => cell.classList.remove('drag-over'));
+    cell.addEventListener('drop', e => {
+      e.preventDefault();
+      cell.classList.remove('drag-over');
+      doDrop(key);
+    });
+
+    grid.appendChild(cell);
+  }
+}
+
+// ────────────────────────────────────────────────────
+//  Shift box
+// ────────────────────────────────────────────────────
+function makeShiftBox(sh, key) {
+  const def = SHIFTS[sh.type] || { hours: '?', color: '#666' };
+  const box = document.createElement('div');
+  box.className = 'shift-box';
+  box.style.background = def.color;
+  box.draggable = true;
+  box.dataset.id = sh.id;
+
+  box.innerHTML = `
+    <span class="s-lbl">${sh.type}</span>
+    <span class="s-hrs">${def.hours}h</span>
+    <button class="s-del" title="Remover">✕</button>`;
+
+  // Drag start
+  box.addEventListener('dragstart', e => {
+    S.dragId  = sh.id;
+    S.dragSrc = key;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', sh.id);
+    requestAnimationFrame(() => box.classList.add('is-dragging'));
+  });
+
+  // Drag end
+  box.addEventListener('dragend', () => {
+    box.classList.remove('is-dragging');
+    S.dragId  = null;
+    S.dragSrc = null;
+    document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+  });
+
+  // Delete
+  box.querySelector('.s-del').addEventListener('click', e => {
+    e.stopPropagation();
+    e.preventDefault();
+    removeShift(key, sh.id);
+  });
+
+  return box;
+}
+
+// ────────────────────────────────────────────────────
+//  Drop handler
+// ────────────────────────────────────────────────────
+function doDrop(targetKey) {
+  if (!S.dragId || !S.dragSrc || S.dragSrc === targetKey) return;
+
+  const srcList = S.shifts[S.dragSrc] || [];
+  const idx     = srcList.findIndex(s => s.id === S.dragId);
+  if (idx === -1) return;
+
+  const [sh] = srcList.splice(idx, 1);
+  if (srcList.length === 0) delete S.shifts[S.dragSrc];
+  else S.shifts[S.dragSrc] = srcList;
+
+  // Máximo um turno por dia — substitui qualquer turno existente no destino
+  S.shifts[targetKey] = [sh];
+
+  render();
+}
+
+// ────────────────────────────────────────────────────
+//  Add / Remove
+// ────────────────────────────────────────────────────
+function addShift(key, type) {
+  // Máximo um turno por dia — substitui se já existir
+  S.shifts[key] = [{ id: uid(), type }];
+  render();
+}
+
+function removeShift(key, id) {
+  if (!S.shifts[key]) return;
+  S.shifts[key] = S.shifts[key].filter(s => s.id !== id);
+  if (S.shifts[key].length === 0) delete S.shifts[key];
+  render();
+}
+
+// ════════════════════════════════════════════════════
+//  SHIFT PICKER MENU
+// ════════════════════════════════════════════════════
+let activeMenu = null;
+
+function openMenu(e, key) {
+  closeMenu();
+
+  const menu = document.createElement('div');
+  menu.className = 'shift-menu';
+  activeMenu = menu;
+
+  for (const [type, def] of Object.entries(SHIFTS)) {
+    const btn = document.createElement('button');
+    btn.className = 'sm-item';
+    btn.style.background = def.color;
+    btn.innerHTML = `<span>${type}</span><span class="sm-hrs">${def.hours}h — ${def.name}</span>`;
+    btn.addEventListener('click', () => { addShift(key, type); closeMenu(); });
+    menu.appendChild(btn);
+  }
+
+  // Position near the + button
+  const r = e.target.getBoundingClientRect();
+  let left = r.left;
+  let top  = r.bottom + 4;
+
+  menu.style.left = left + 'px';
+  menu.style.top  = top  + 'px';
+  document.body.appendChild(menu);
+
+  // Adjust if off screen
+  const mr = menu.getBoundingClientRect();
+  if (mr.right  > window.innerWidth  - 8) menu.style.left = (window.innerWidth  - mr.width  - 8) + 'px';
+  if (mr.bottom > window.innerHeight - 8) menu.style.top  = (r.top - mr.height - 4) + 'px';
+
+  setTimeout(() => document.addEventListener('click', onOutside), 0);
+}
+
+function closeMenu() {
+  activeMenu?.remove();
+  activeMenu = null;
+  document.removeEventListener('click', onOutside);
+}
+
+function onOutside(e) {
+  if (activeMenu && !activeMenu.contains(e.target)) closeMenu();
+}
+
+// ════════════════════════════════════════════════════
+//  PDF PARSING
+// ════════════════════════════════════════════════════
+async function parsePDF(file) {
+  const buf  = await file.arrayBuffer();
+  const pdf  = await pdfjsLib.getDocument({ data: buf }).promise;
+  const page = await pdf.getPage(1);
+  const tc   = await page.getTextContent();
+  const items = tc.items.filter(i => i.str?.trim());
+
+  // ── Full text for regex ──────────────────────────
+  const fullText = items.map(i => i.str).join(' ');
+
+  // Employee name  — everything after "Nome:" up to a run of spaces or next label
+  const nameM = fullText.match(/Nome:\s*(.+?)(?:\s{4,}|Empresa:|CPF:|$)/);
+  const empName = nameM ? nameM[1].trim() : '';
+
+  // Month + Year
+  let pMonth = today.getMonth(), pYear = today.getFullYear();
+  const mesM = fullText.match(/Mês[:\s]*(\d{1,2})\/(\d{4})/);
+  if (mesM) { pMonth = parseInt(mesM[1]) - 1; pYear = parseInt(mesM[2]); }
+
+  // Total hours required (e.g. "72:00h" or "72:00")
+  let required = 0;
+  const hrM = fullText.match(/Total de Horas a Trabalhar[:\s]+(\d+):(\d{2})/);
+  if (hrM) required = parseInt(hrM[1]) * 60 + parseInt(hrM[2]);
+
+  // ── Group text items by Y row ────────────────────
+  // PDF coordinates: Y increases upward; round to nearest 3 to cluster same-row items
+  const byY = new Map();
+  for (const it of items) {
+    const y = Math.round(it.transform[5] / 3) * 3;
+    if (!byY.has(y)) byY.set(y, []);
+    byY.get(y).push({ str: it.str.trim(), x: it.transform[4] });
+  }
+  for (const row of byY.values()) row.sort((a, b) => a.x - b.x);
+
+  const VALID = new Set(['M2','M','A','P','T','T2','SD','SN']);
+
+  // ── Find day-numbers row (most items matching 1..31) ──
+  let dayRow = null, maxDays = 0;
+  for (const [y, row] of byY) {
+    const nums = row.filter(i => /^\d{1,2}$/.test(i.str) && +i.str >= 1 && +i.str <= 31);
+    if (nums.length > maxDays) { maxDays = nums.length; dayRow = { y, nums }; }
+  }
+
+  // ── Find shift-codes row (near dayRow, most valid codes) ──
+  let shiftRow = null, maxSh = 0;
+  if (dayRow) {
+    for (const [y, row] of byY) {
+      if (y === dayRow.y || Math.abs(y - dayRow.y) > 45) continue;
+      const shs = row.filter(i => VALID.has(i.str));
+      if (shs.length > maxSh) { maxSh = shs.length; shiftRow = { y, shs }; }
+    }
+  }
+
+  // ── Map shifts to day numbers ────────────────────
+  const parsedShifts = {}; // day (1-31) -> shift type string
+  if (dayRow && shiftRow) {
+    const dayMap = dayRow.nums.map(i => ({ x: i.x, day: +i.str }));
+    for (const sh of shiftRow.shs) {
+      let bestDay = null, minD = Infinity;
+      for (const { x, day } of dayMap) {
+        const d = Math.abs(x - sh.x);
+        if (d < minD) { minD = d; bestDay = day; }
+      }
+      if (bestDay !== null && minD < 30) parsedShifts[bestDay] = sh.str;
+    }
+  }
+
+  return { pMonth, pYear, required, parsedShifts };
+}
+
+// ════════════════════════════════════════════════════
+//  RENDER (full)
+// ════════════════════════════════════════════════════
+function render() {
+  renderCal();
+  updateStats();
+  updateLegendUI();
+  updateDowChecks();
+}
+
+// ════════════════════════════════════════════════════
+//  CHECKBOXES DE COLUNA (dia-da-semana)
+// ════════════════════════════════════════════════════
+let dowCheckboxes = []; // índice 0=Dom … 6=Sáb
+
+function updateDowChecks() {
+  const { year, month } = S;
+  const totalDays = dims(year, month);
+  for (let dow = 0; dow < 7; dow++) {
+    const chk = dowCheckboxes[dow];
+    if (!chk) continue;
+    let total = 0, sel = 0;
+    for (let d = 1; d <= totalDays; d++) {
+      if (new Date(year, month, d).getDay() === dow) {
+        total++;
+        if (S.selectedDays.has(dkey(year, month, d))) sel++;
+      }
+    }
+    chk.indeterminate = sel > 0 && sel < total;
+    chk.checked       = total > 0 && sel === total;
+  }
+}
+
+// ════════════════════════════════════════════════════
+//  SELEÇÃO E APLICAÇÃO EM LOTE
+// ════════════════════════════════════════════════════
+function updateLegendUI() {
+  const legend = document.getElementById('legend');
+  if (legend) legend.classList.toggle('has-sel', S.selectedDays.size > 0);
+}
+
+function applyToSelected(type) {
+  if (S.selectedDays.size === 0) return;
+  for (const key of S.selectedDays) {
+    S.shifts[key] = [{ id: uid(), type }];
+  }
+  S.selectedDays = new Set();   // desfaz seleção após aplicar
+  render();
+}
+
+// ════════════════════════════════════════════════════
+//  EVENT WIRING
+// ════════════════════════════════════════════════════
+// Chips → aplicar turno nos dias selecionados
+document.querySelectorAll('.chip[data-type]').forEach(chip => {
+  chip.addEventListener('click', () => applyToSelected(chip.dataset.type));
+});
+
+document.getElementById('loadBtn').addEventListener('click', () =>
+  document.getElementById('pdfFile').click());
+
+document.getElementById('pdfFile').addEventListener('change', async e => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  const ov = document.getElementById('loading');
+  ov.classList.add('on');
+
+  try {
+    const { pMonth, pYear, required, parsedShifts } = await parsePDF(file);
+
+    S.pdfMonth = pMonth;
+    S.pdfYear  = pYear;
+    // Garante múltiplo de 4h (240 min); arredonda para o mais próximo
+    S.required = Math.round(required / 240) * 240;
+    S.year     = pYear;
+    S.month    = pMonth;
+
+    // Clear only the PDF's month shifts, keep others
+    for (let d = 1; d <= dims(pYear, pMonth); d++) {
+      delete S.shifts[dkey(pYear, pMonth, d)];
+    }
+
+    // Add parsed shifts
+    for (const [day, type] of Object.entries(parsedShifts)) {
+      // Map to known types (M2 exact, M exact, A exact; others ignored)
+      const t = SHIFTS[type] ? type : null;
+      if (!t) continue;
+      const k = dkey(pYear, pMonth, +day);
+      if (!S.shifts[k]) S.shifts[k] = [];
+      S.shifts[k].push({ id: uid(), type: t });
+    }
+
+    render();
+  } catch (err) {
+    console.error(err);
+    alert('Erro ao processar o PDF.\n\n' + err.message);
+  } finally {
+    ov.classList.remove('on');
+    e.target.value = '';
+  }
+});
+
+function resetMonth() {
+  S.shifts       = {};
+  S.required     = 4800;   // 80h padrão ao entrar em qualquer mês novo
+  S.pdfMonth     = null;
+  S.pdfYear      = null;
+  S.selectedDays = new Set();
+}
+
+document.getElementById('prevMon').addEventListener('click', () => {
+  if (S.month === 0) { S.month = 11; S.year--; }
+  else S.month--;
+  resetMonth();
+  render();
+});
+
+document.getElementById('nextMon').addEventListener('click', () => {
+  if (S.month === 11) { S.month = 0; S.year++; }
+  else S.month++;
+  resetMonth();
+  render();
+});
+
+// Edição de horas a trabalhar (múltiplos de 4h = 240 min)
+document.getElementById('reqMinus').addEventListener('click', () => {
+  S.required = Math.max(0, S.required - 240);
+  updateStats();
+});
+document.getElementById('reqPlus').addEventListener('click', () => {
+  S.required += 240;
+  updateStats();
+});
+
+// ════════════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════════════
+render();
+</script>
+</body>
+</html>
