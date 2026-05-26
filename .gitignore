@@ -6,6 +6,10 @@ __pycache__/
 *.py[cod]
 .env
 
+# Claude Code internals
+.claude/
+.playwright-mcp/
+
 # OS
 .DS_Store
 Thumbs.db
