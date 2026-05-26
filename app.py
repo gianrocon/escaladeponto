@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit.components.v1 as components
 from pathlib import Path
 
 st.set_page_config(
@@ -23,4 +22,4 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 html = Path("calendario.html").read_text(encoding="utf-8")
-components.html(html, height=950, scrolling=True)
+st.iframe(html, height=950, scrolling=True)
