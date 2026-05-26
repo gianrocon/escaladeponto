@@ -22,4 +22,4 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 html = Path("calendario.html").read_text(encoding="utf-8")
-st.iframe(html, height=950, scrolling=True)
+st.iframe(html, height=950)
